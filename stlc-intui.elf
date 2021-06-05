@@ -1,0 +1,167 @@
+%% Type soundness of simply-typed lambda calculus with products and sums.
+%% Call-by-value.
+
+tp : type.
+0 : tp.
+1 : tp.
+* : tp -> tp -> tp. %infix left 30 *.
++ : tp -> tp -> tp. %infix left 20 +.
+=> : tp -> tp -> tp. %infix right 10 =>.
+
+tm : tp -> type.
+val : tm T -> type.
+
+abort : tm 0 -> tm T.
+unit : tm 1.
+pair : tm T -> tm T' -> tm (T * T').
+fst : tm (T * T') -> tm T. snd : tm (T * T') -> tm T'.
+inl : tm T -> tm (T + T'). inr : tm T' -> tm (T + T').
+case : tm (T1 + T2) -> ({E:tm T1} val E -> tm T) -> ({E:tm T2} val E -> tm T) -> tm T.
+app : tm (T => T') -> tm T -> tm T'.
+abs : ({E:tm T} val E -> tm T') -> tm (T => T').
+
+val/unit : val unit.
+val/pair : val (pair E1 E2)
+            <- val E2
+            <- val E1.
+val/inl : val (inl E)
+           <- val E.
+val/inr : val (inr E)
+           <- val E.
+val/abs : val (abs E).
+
+red : tm T -> tm T -> type.
+
+red/abort : red (abort E) (abort E')
+             <- red E E'.
+red/pair1 : red (pair E1 E2) (pair E1' E2)
+             <- red E1 E1'.
+red/pair2 : red (pair V1 E2) (pair V1 E2')
+             <- red E2 E2'
+             <- val V1.
+red/fst : red (fst E) (fst E')
+           <- red E E'.
+red/snd : red (snd E) (snd E')
+           <- red E E'.
+red/inl : red (inl E) (inl E')
+           <- red E E'.
+red/inr : red (inr E) (inr E')
+           <- red E E'.
+red/case : red (case E E1 E2) (case E' E1 E2)
+            <- red E E'.
+red/app1 : red (app E1 E2) (app E1' E2)
+            <- red E1 E1'.
+red/app2 : red (app V1 E2) (app V1 E2')
+            <- red E2 E2'
+            <- val V1.
+
+red/beta/*1 : red (fst (pair V1 V2)) V1
+               <- val V2
+               <- val V1.
+red/beta/*2 : red (snd (pair V1 V2)) V2
+               <- val V2
+               <- val V1.
+red/beta/+1 : {A:val V} red (case (inl V) E1 E2) (E1 V A).
+red/beta/+2 : {A:val V} red (case (inr V) E1 E2) (E2 V A).
+red/beta/=> : {A:val V} red (app (abs E) V) (E V A).
+
+red-or-val : tm T -> type.
+red-or-val/red : red-or-val E
+                <- red E E'.
+red-or-val/val : red-or-val V
+                  <- val V.
+
+progress : {E:tm T} red-or-val E -> type.
+progress/abort : {T:tp} red-or-val E -> red-or-val (abort E : tm T) -> type.
+progress/pair : red-or-val E1 -> red-or-val E2 -> red-or-val (pair E1 E2) -> type.
+progress/fst : red-or-val E -> red-or-val (fst E) -> type.
+progress/snd : red-or-val E -> red-or-val (snd E) -> type.
+progress/inl : {T':tp} red-or-val E -> red-or-val (inl E : tm (T + T')) -> type.
+progress/inr : {T:tp} red-or-val E -> red-or-val (inr E : tm (T + T')) -> type.
+progress/case : {T:tp} {E1} {E2} red-or-val E -> red-or-val (case E E1 E2 : tm T) -> type.
+progress/app : red-or-val E1 -> red-or-val E2 -> red-or-val (app E1 E2) -> type.
+
+%mode progress +E -D.
+%mode progress/abort +T +D1 -D.
+%mode progress/pair +D1 +D2 -D.
+%mode progress/fst +D1 -D.
+%mode progress/snd +D1 -D.
+%mode progress/inl +T' +D1 -D.
+%mode progress/inr +T +D1 -D.
+%mode progress/case +T +E1 +E2 +D1 -D.
+%mode progress/app +D1 +D2 -D.
+
+- : progress (abort E) D
+     <- progress E D1
+     <- progress/abort T D1 D.
+- : progress (unit) (red-or-val/val (val/unit)).
+- : progress (pair E1 E2) R
+     <- progress E1 R1
+     <- progress E2 R2
+     <- progress/pair R1 R2 R.
+- : progress (fst E) D
+     <- progress E D1
+     <- progress/fst D1 D.
+- : progress (snd E) D
+     <- progress E D1
+     <- progress/snd D1 D.
+- : progress (inl E) D
+     <- progress E D1
+     <- progress/inl T' D1 D.
+- : progress (inr E) D
+     <- progress E D1
+     <- progress/inr T D1 D.
+- : progress (case E E1 E2) D
+     <- progress E D1
+     <- progress/case T E1 E2 D1 D.
+- : progress (app E1 E2) D
+     <- progress E1 D1
+     <- progress E2 D2
+     <- progress/app D1 D2 D.
+- : progress (abs E) (red-or-val/val val/abs).
+
+- : progress/abort _ (red-or-val/red R) (red-or-val/red (red/abort R)).
+
+- : progress/pair (red-or-val/red R) _ (red-or-val/red (red/pair1 R)).
+- : progress/pair (red-or-val/val V) (red-or-val/red R) (red-or-val/red (red/pair2 V R)).
+- : progress/pair (red-or-val/val V1) (red-or-val/val V2) (red-or-val/val (val/pair V1 V2)).
+
+- : progress/fst (red-or-val/red R) (red-or-val/red (red/fst R)).
+- : progress/fst (red-or-val/val (val/pair V1 V2)) (red-or-val/red (red/beta/*1 V1 V2)).
+
+- : progress/snd (red-or-val/red R) (red-or-val/red (red/snd R)).
+- : progress/snd (red-or-val/val (val/pair V1 V2)) (red-or-val/red (red/beta/*2 V1 V2)).
+
+- : progress/inl T' (red-or-val/red R) (red-or-val/red (red/inl R)).
+- : progress/inl T' (red-or-val/val V) (red-or-val/val (val/inl V)).
+
+- : progress/inr T (red-or-val/red R) (red-or-val/red (red/inr R)).
+- : progress/inr T (red-or-val/val V) (red-or-val/val (val/inr V)).
+
+- : progress/case T _ _ (red-or-val/red R) (red-or-val/red (red/case R)).
+- : progress/case T _ _ (red-or-val/val (val/inl V)) (red-or-val/red (red/beta/+1 V)).
+- : progress/case T _ _ (red-or-val/val (val/inr V)) (red-or-val/red (red/beta/+2 V)).
+
+- : progress/app (red-or-val/red R) _ (red-or-val/red (red/app1 R)).
+- : progress/app (red-or-val/val V) (red-or-val/red R) (red-or-val/red (red/app2 V R)).
+- : progress/app (red-or-val/val (val/abs)) (red-or-val/val V) (red-or-val/red (red/beta/=> V)).
+
+%worlds () (progress/abort _ _ _).
+%worlds () (progress/pair _ _ _).
+%worlds () (progress/fst _ _).
+%worlds () (progress/snd _ _).
+%worlds () (progress/inl _ _ _).
+%worlds () (progress/inr _ _ _).
+%worlds () (progress/case _ _ _ _ _).
+%worlds () (progress/app _ _ _).
+%worlds () (progress _ _).
+
+%total [D1] (progress/abort _ D1 _).
+%total [D1 D2] (progress/pair D1 D2 _).
+%total [D1] (progress/fst D1 _).
+%total [D1] (progress/snd D1 _).
+%total [D1] (progress/inl _ D1 _).
+%total [D1] (progress/inr _ D1 _).
+%total [D1] (progress/case _ _ _ D1 _).
+%total [D1 D2] (progress/app D1 D2 _).
+%total [E] (progress E _).
