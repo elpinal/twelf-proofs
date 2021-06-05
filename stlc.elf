@@ -1,0 +1,46 @@
+%% Type soundness of simply-typed lambda calculus with unit.
+%% Call-by-value.
+
+tp : type.
+Unit : tp.
+=> : tp -> tp -> tp. %infix right 10 =>.
+
+val : tp -> type.
+tm : tp -> type.
+
+ret : val T -> tm T.
+unit : val Unit.
+app : tm (T => T') -> tm T -> tm T'.
+abs : (val T -> tm T') -> val (T => T').
+
+red : tm T -> tm T -> type.
+red/app1 : red (app E1 E2) (app E1' E2)
+            <- red E1 E1'.
+red/app2 : red (app (ret V) E) (app (ret V) E')
+            <- red E E'.
+red/beta : red (app (ret (abs E)) (ret V)) (E V).
+
+red-or-val : {T:tp} tm T -> type.
+red-or-val/red : red-or-val T E
+                <- red E E'.
+red-or-val/val : red-or-val T (ret V).
+
+progress : {T:tp} {E:tm T} red-or-val T E -> type.
+%mode progress +T +E -D.
+progress/app : red-or-val (T => T') E1 -> red-or-val T E2 -> red-or-val T' (app E1 E2) -> type.
+%mode progress/app +D1 +D2 -D.
+
+- : progress T (ret V) (red-or-val/val).
+- : progress T' (app E1 E2) D
+     <- progress (T => T') E1 D1
+     <- progress T E2 D2
+     <- progress/app D1 D2 D.
+
+- : progress/app (red-or-val/red R1) _ (red-or-val/red (red/app1 R1)).
+- : progress/app red-or-val/val (red-or-val/red R2) (red-or-val/red (red/app2 R2)).
+- : progress/app (red-or-val/val) red-or-val/val (red-or-val/red red/beta).
+
+%worlds () (progress/app _ _ _).
+%worlds () (progress _ _ _).
+%total [D1 D2] (progress/app D1 D2 _).
+%total E (progress _ E _).
