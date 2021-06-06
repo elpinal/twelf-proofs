@@ -1,0 +1,72 @@
+%% Type soundness of LKT.
+%% Call-by-name.
+
+tp : type.
+* : tp -> tp -> tp. %infix left 30 *.
++ : tp -> tp -> tp. %infix left 20 +.
+neg : tp -> tp.
+=> : tp -> tp -> tp. %infix right 10 =>.
+forall : (tp -> tp) -> tp.
+exist : (tp -> tp) -> tp.
+
+cmd : type.
+tm : tp -> type.
+cotm : tp -> type.
+coval : tp -> type.
+
+cut : tm T -> cotm T -> cmd.
+done : cmd.
+
+mu : (coval T -> cmd) -> tm T.
+pair : tm T -> tm T' -> tm (T * T').
+inl : tm T -> tm (T + T'). inr : tm T' -> tm (T + T').
+not : cotm T -> tm (neg T).
+abs : (tm T -> tm T') -> tm (T => T').
+gen : ({x:tp} tm (T x)) -> tm (forall T).
+pack : {w:tp} tm (T w) -> tm (exist T).
+
+foc : coval T -> cotm T.
+mut : (tm T -> cmd) -> cotm T.
+
+fst : coval T1 -> coval (T1 * T2).
+snd : coval T2 -> coval (T1 * T2).
+case : coval T1 -> coval T2 -> coval (T1 + T2).
+conot : tm T -> coval (neg T).
+app : tm T1 -> coval T2 -> coval (T1 => T2).
+inst : {i:tp} coval (T i) -> coval (forall T).
+unpack : ({w:tp} cotm (T w)) -> coval (exist T).
+
+red : cmd -> cmd -> type.
+red/mut : red (cut E (mut C)) (C E).
+red/mu : red (cut (mu C) (foc S)) (C S).
+red/*1 : red (cut (pair E1 _) (foc (fst S))) (cut E1 (foc S)).
+red/*2 : red (cut (pair _ E2) (foc (snd S))) (cut E2 (foc S)).
+red/+1 : red (cut (inl E) (foc (case S1 _))) (cut E (foc S1)).
+red/+2 : red (cut (inr E) (foc (case _ S2))) (cut E (foc S2)).
+red/neg : red (cut (not K) (foc (conot E))) (cut E K).
+red/=> : red (cut (abs E) (foc (app E' S))) (cut (E E') (foc S)).
+red/forall : red (cut (gen E) (foc (inst I S))) (cut (E I) (foc S)).
+red/exist : red (cut (pack W E) (foc (unpack K))) (cut E (K W)).
+
+red-or-done : cmd -> type.
+red-or-done/red : red-or-done C
+                   <- red C C'.
+red-or-done/done : red-or-done done.
+
+progress : {C:cmd} red-or-done C -> type.
+%mode progress +C -D.
+
+- : progress done red-or-done/done.
+- : progress (cut E (mut C)) (red-or-done/red red/mut).
+- : progress (cut (mu C) (foc S)) (red-or-done/red red/mu).
+- : progress (cut (pair E1 E2) (foc (fst S))) (red-or-done/red red/*1).
+- : progress (cut (pair E1 E2) (foc (snd S))) (red-or-done/red red/*2).
+- : progress (cut (inl E) (foc (case S1 S2))) (red-or-done/red red/+1).
+- : progress (cut (inr E) (foc (case S1 S2))) (red-or-done/red red/+2).
+- : progress (cut (not K) (foc (conot E))) (red-or-done/red red/neg).
+- : progress (cut (abs E) (foc (app E' S))) (red-or-done/red red/=>).
+- : progress (cut (gen E) (foc (inst I S))) (red-or-done/red red/forall).
+- : progress (cut (pack W E) (foc (unpack K))) (red-or-done/red red/exist).
+
+%worlds () (progress _ _).
+%total C (progress C _).
