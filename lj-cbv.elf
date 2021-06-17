@@ -1,0 +1,253 @@
+%% Type soundness of an computational interpretation of LJ.
+%% Call-by-value.
+%% Moreover, the uniqueness of the rewriting relation is proved.
+
+tp : type.
+* : tp -> tp -> tp. %infix left 30 *.
++ : tp -> tp -> tp. %infix left 20 +.
+=> : tp -> tp -> tp. %infix right 10 =>.
+true : tp.
+false : tp.
+
+cmd : tp -> type.
+tm : tp -> type.
+val : tp -> type.
+cotm : tp -> tp -> type.
+
+cut : tm T -> cotm T R -> cmd R.
+
+foc : val T -> tm T.
+adjoint : cmd R -> tm R.
+
+pair : val T1 -> val T2 -> val (T1 * T2).
+inl : val T1 -> val (T1 + T2). inr : val T2 -> val (T1 + T2).
+abs : (val T1 -> tm T2) -> val (T1 => T2).
+unit : val true.
+
+star : cotm R R.
+mut : (val T -> cmd R) -> cotm T R.
+fst : cotm T1 R -> cotm (T1 * T2) R. snd : cotm T2 R -> cotm (T1 * T2) R.
+case : cotm T1 R -> cotm T2 R -> cotm (T1 + T2) R.
+app : val T1 -> cotm T2 R -> cotm (T1 => T2) R.
+abort : cotm false R.
+
+
+subst/cmd : cmd T -> cotm T R -> cmd R -> type.
+subst/cotm : cotm T0 T -> cotm T R -> cotm T0 R -> type.
+
+%mode subst/cmd +C1 +K -C2.
+%mode subst/cotm +K1 +K2 -K3.
+
+subst/cmd/cut : subst/cmd (cut E K) K' (cut E K'')
+                 <- subst/cotm K K' K''.
+
+subst/cotm/star : subst/cotm star K' K'.
+subst/cotm/mut : subst/cotm (mut C) K' (mut C')
+                  <- ({v} subst/cmd (C v) K' (C' v)).
+subst/cotm/fst : subst/cotm (fst K) K' (fst K'')
+                  <- subst/cotm K K' K''.
+subst/cotm/snd : subst/cotm (snd K) K' (snd K'')
+                  <- subst/cotm K K' K''.
+subst/cotm/case : subst/cotm (case K1 K2) K' (case K1' K2')
+                   <- subst/cotm K2 K' K2'
+                   <- subst/cotm K1 K' K1'.
+subst/cotm/app : subst/cotm (app V K) K' (app V K'')
+                  <- subst/cotm K K' K''.
+subst/cotm/abort : subst/cotm abort K' abort.
+
+%block bind : some {T} block {_: val T}.
+
+%worlds (bind) (subst/cmd _ _ _) (subst/cotm _ _ _).
+
+%total (C1 K1) (subst/cmd C1 _ _) (subst/cotm K1 _ _).
+
+
+is/cmd : cmd R -> cmd R -> type.
+is/cotm : cotm T R -> cotm T R -> type.
+
+is/cmd/refl : {R} {C:cmd R} is/cmd C C.
+is/cotm/refl : {T} {K:cotm T R} is/cotm K K.
+
+is/cmd/cong : {E:tm T} is/cotm K1 K2 -> is/cmd (cut E K1) (cut E K2) -> type.
+is/cotm/cong/mut : ({v} is/cmd (C1 v) (C2 v)) -> is/cotm (mut C1) (mut C2) -> type.
+is/cotm/cong/fst : {T2:tp} is/cotm K1 K2 -> is/cotm (fst K1 : cotm (T1 * T2) R) (fst K2) -> type.
+is/cotm/cong/snd : {T1:tp} is/cotm K1 K2 -> is/cotm (snd K1 : cotm (T1 * T2) R) (snd K2) -> type.
+is/cotm/cong/case : is/cotm K1 K2 -> is/cotm K1' K2'
+                                    -> is/cotm (case K1 K1') (case K2 K2') -> type.
+is/cotm/cong/app : {V:val T1} is/cotm K1 K2 -> is/cotm (app V K1) (app V K2) -> type.
+
+%mode is/cmd/cong +E +X -Y.
+%mode is/cotm/cong/mut +X -Y.
+%mode is/cotm/cong/fst +T2 +X -Y.
+%mode is/cotm/cong/snd +T1 +X -Y.
+%mode is/cotm/cong/case +X +Y -Z.
+%mode is/cotm/cong/app +V +X -Y.
+
+- : is/cmd/cong (E : tm T) (is/cotm/refl T (K : cotm T R)) (is/cmd/refl R (cut E K)).
+- : is/cotm/cong/mut ([v] is/cmd/refl R (C v)) (is/cotm/refl T (mut C)).
+- : is/cotm/cong/fst T2 (is/cotm/refl T1 K) (is/cotm/refl (T1 * T2) (fst K)).
+- : is/cotm/cong/snd T1 (is/cotm/refl T2 K) (is/cotm/refl (T1 * T2) (snd K)).
+- : is/cotm/cong/case (is/cotm/refl T1 K1) (is/cotm/refl T2 K2) (is/cotm/refl (T1 + T2) (case K1 K2)).
+- : is/cotm/cong/app V (is/cotm/refl T2 K) (is/cotm/refl (T1 => T2) (app V K)).
+
+%worlds (bind) (is/cmd/cong _ _ _).
+%worlds (bind) (is/cotm/cong/mut _ _).
+%worlds (bind) (is/cotm/cong/fst _ _ _).
+%worlds (bind) (is/cotm/cong/snd _ _ _).
+%worlds (bind) (is/cotm/cong/case _ _ _).
+%worlds (bind) (is/cotm/cong/app _ _ _).
+
+%total (X) (is/cmd/cong _ X _).
+%total (X) (is/cotm/cong/mut X _).
+%total (X) (is/cotm/cong/fst _ X _).
+%total (X) (is/cotm/cong/snd _ X _).
+%total (X) (is/cotm/cong/case X _ _).
+%total (X) (is/cotm/cong/app _ X _).
+
+
+unique/subst/cmd : subst/cmd C K C1 -> subst/cmd C K C2 -> is/cmd C1 C2 -> type.
+unique/subst/cotm : {T:tp} {K:cotm T R} {K1:cotm T R'} {K2:cotm T R'}
+                     subst/cotm K K' K1 -> subst/cotm K K' K2 -> is/cotm K1 K2 -> type.
+
+%mode unique/subst/cmd +S1 +S2 -D.
+%mode unique/subst/cotm +T +K +K1 +K2 +S1 +S2 -D.
+
+- : unique/subst/cmd (subst/cmd/cut S1) (subst/cmd/cut S2) D'
+     <- unique/subst/cotm T K K1 K2 S1 S2 D
+     <- is/cmd/cong (E : tm T) D D'.
+- : unique/subst/cotm T star K' K' (subst/cotm/star) (subst/cotm/star) (is/cotm/refl T K').
+- : unique/subst/cotm T (mut C) (mut C1) (mut C2) (subst/cotm/mut S1) (subst/cotm/mut S2) D'
+     <- ({v} unique/subst/cmd (S1 v) (S2 v) (D v))
+     <- is/cotm/cong/mut D D'.
+- : unique/subst/cotm (T1 * T2) (fst K) (fst K1) (fst K2) (subst/cotm/fst S1) (subst/cotm/fst S2) D'
+     <- unique/subst/cotm T1 K K1 K2 S1 S2 D
+     <- is/cotm/cong/fst T2 D D'.
+- : unique/subst/cotm (T1 * T2) (snd K) (snd K1) (snd K2) (subst/cotm/snd S1) (subst/cotm/snd S2) D'
+     <- unique/subst/cotm T2 K K1 K2 S1 S2 D
+     <- is/cotm/cong/snd T1 D D'.
+- : unique/subst/cotm (T1 + T2) (case K1 K2) (case K1' K2') (case K1'' K2'') (subst/cotm/case S1 U1) (subst/cotm/case S2 U2) D'
+     <- unique/subst/cotm T2 K2 K2' K2'' U1 U2 D2
+     <- unique/subst/cotm T1 K1 K1' K1'' S1 S2 D1
+     <- is/cotm/cong/case D1 D2 D'.
+- : unique/subst/cotm (T1 => T2) (app V K) (app V K1) (app V K2) (subst/cotm/app S1) (subst/cotm/app S2) D'
+     <- unique/subst/cotm T2 K K1 K2 S1 S2 D
+     <- is/cotm/cong/app V D D'.
+- : unique/subst/cotm false abort abort abort (subst/cotm/abort) (subst/cotm/abort) (is/cotm/refl false abort).
+
+%worlds (bind) (unique/subst/cmd _ _ _) (unique/subst/cotm _ _ _ _ _ _ _).
+%total (S1 S1') (unique/subst/cmd S1 _ _) (unique/subst/cotm _ _ _ _ S1' _ _).
+
+
+rewrite : cmd R -> cmd R -> type.
+rewrite/adjoint : rewrite (cut (adjoint C) K) C'
+                   <- subst/cmd C K C'.
+rewrite/mut : rewrite (cut (foc V) (mut C)) (C V).
+rewrite/*1 : rewrite (cut (foc (pair E1 E2)) (fst K)) (cut (foc E1) K).
+rewrite/*2 : rewrite (cut (foc (pair E1 E2)) (snd K)) (cut (foc E2) K).
+rewrite/+1 : rewrite (cut (foc (inl E)) (case K1 K2)) (cut (foc E) K1).
+rewrite/+2 : rewrite (cut (foc (inr E)) (case K1 K2)) (cut (foc E) K2).
+rewrite/=> : rewrite (cut (foc (abs E)) (app V K)) (cut (E V) K).
+
+unique : rewrite C C1 -> rewrite C C2 -> is/cmd C1 C2 -> type.
+%mode unique +R1 +R2 -D.
+
+- : unique R R (is/cmd/refl T C).
+- : unique (rewrite/adjoint S1) (rewrite/adjoint S2) I
+     <- unique/subst/cmd S1 S2 I.
+
+%worlds (bind) (unique _ _ _).
+%total (C1) (unique C1 _ _).
+
+
+red/cmd : cmd T -> cmd T -> type.
+red/tm : tm T -> tm T -> type.
+red/val : val T -> val T -> type.
+red/cotm : cotm T R -> cotm T R -> type.
+
+red/cmd/here : red/cmd C C'
+                <- rewrite C C'.
+red/cmd/tm : red/cmd (cut E K) (cut E' K)
+              <- red/tm E E'.
+red/cmd/cotm : red/cmd (cut E K) (cut E K')
+                <- red/cotm K K'.
+
+red/tm/foc : red/tm (foc V) (foc V')
+              <- red/val V V'.
+red/tm/adjoint : red/tm (adjoint C) (adjoint C')
+                  <- red/cmd C C'.
+
+red/val/pair1 : red/val (pair V1 V2) (pair V1' V2)
+                 <- red/val V1 V1'.
+red/val/pair2 : red/val (pair V1 V2) (pair V1 V2')
+                 <- red/val V2 V2'.
+red/val/inl : red/val (inl V) (inl V')
+               <- red/val V V'.
+red/val/inr : red/val (inr V) (inr V')
+               <- red/val V V'.
+red/val/abs : red/val (abs E) (abs E')
+               <- ({v} red/tm (E v) (E' v)).
+
+red/cotm/mut : red/cotm (mut C) (mut C')
+                <- ({v} red/cmd (C v) (C' v)).
+red/cotm/fst : red/cotm (fst K) (fst K')
+                <- red/cotm K K'.
+red/cotm/snd : red/cotm (snd K) (snd K')
+                <- red/cotm K K'.
+red/cotm/case1 : red/cotm (case K1 K2) (case K1' K2)
+                  <- red/cotm K1 K1'.
+red/cotm/case2 : red/cotm (case K1 K2) (case K1 K2')
+                  <- red/cotm K2 K2'.
+red/cotm/app1 : red/cotm (app V K) (app V' K)
+                 <- red/val V V'.
+red/cotm/app2 : red/cotm (app V K) (app V K')
+                 <- red/cotm K K'.
+
+
+substitute/cmd : {C:cmd T} {K:cotm T R} subst/cmd C K C' -> type.
+substitute/cotm : {K:cotm T1 T2} {K':cotm T2 T3} subst/cotm K K' K'' -> type.
+
+%mode substitute/cmd +C +K -S.
+%mode substitute/cotm +K +K' -S.
+
+- : substitute/cmd (cut E K) K' (subst/cmd/cut S)
+     <- substitute/cotm K K' S.
+
+- : substitute/cotm star K' subst/cotm/star.
+- : substitute/cotm (mut C) K' (subst/cotm/mut S)
+     <- ({v} substitute/cmd (C v) K' (S v)).
+- : substitute/cotm (fst K) K' (subst/cotm/fst S)
+     <- substitute/cotm K K' S.
+- : substitute/cotm (snd K) K' (subst/cotm/snd S)
+     <- substitute/cotm K K' S.
+- : substitute/cotm (case K1 K2) K' (subst/cotm/case S1 S2)
+     <- substitute/cotm K2 K' S2
+     <- substitute/cotm K1 K' S1.
+- : substitute/cotm (app V K) K' (subst/cotm/app S)
+     <- substitute/cotm K K' S.
+- : substitute/cotm abort K' subst/cotm/abort.
+
+%worlds (bind) (substitute/cmd _ _ _) (substitute/cotm _ _ _).
+%total (C K) (substitute/cmd C _ _) (substitute/cotm K _ _).
+
+
+rewrite-or-done : cmd R -> type.
+rewrite-or-done/rewrite : rewrite-or-done C
+                           <- rewrite C C'.
+rewrite-or-done/done : rewrite-or-done (cut (foc V) star).
+
+progress : {C:cmd T} rewrite-or-done C -> type.
+%mode progress +C -D.
+
+- : progress (cut (foc V) star) (rewrite-or-done/done).
+- : progress (cut (foc V) (mut C)) (rewrite-or-done/rewrite rewrite/mut).
+- : progress (cut (foc (pair V1 V2)) (fst K)) (rewrite-or-done/rewrite rewrite/*1).
+- : progress (cut (foc (pair V1 V2)) (snd K)) (rewrite-or-done/rewrite rewrite/*2).
+- : progress (cut (foc (inl V)) (case K1 K2)) (rewrite-or-done/rewrite rewrite/+1).
+- : progress (cut (foc (inr V)) (case K1 K2)) (rewrite-or-done/rewrite rewrite/+2).
+- : progress (cut (foc (abs E)) (app V K)) (rewrite-or-done/rewrite rewrite/=>).
+
+- : progress (cut (adjoint C) K) (rewrite-or-done/rewrite (rewrite/adjoint S))
+     <- substitute/cmd C K S.
+
+%worlds () (progress _ _).
+%total (C) (progress C _).
