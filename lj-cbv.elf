@@ -1,4 +1,4 @@
-%% Type soundness of an computational interpretation of LJ.
+%% Type soundness of a computational interpretation of LJ.
 %% Call-by-value.
 %% Moreover, the uniqueness of the rewriting relation is proved.
 
