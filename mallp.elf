@@ -1,0 +1,321 @@
+%% "Positive formula" lemma for MALLP:
+%%   Each derivable sequent contains at most 1 positive formula.
+
+atom : type.
+
+pos : type.
+neg : type.
+
+%name pos P.
+%name neg N.
+
+atm : atom -> pos.
+1 : pos.
+tensor : pos -> pos -> pos.
+0 : pos.
+plus : pos -> pos -> pos.
+exist : atom -> pos -> pos.
+down : neg -> pos.
+
+natm : atom -> neg.
+bot : neg.
+par : neg -> neg -> neg.
+top : neg.
+with : neg -> neg -> neg.
+forall : atom -> neg -> neg.
+up : pos -> neg.
+
+
+dual : pos -> neg -> type.
+
+dual/atm : dual (atm X) (natm X).
+dual/1 : dual 1 bot.
+dual/tensor : dual (tensor P Q) (par M N)
+               <- dual Q N
+               <- dual P M.
+dual/0 : dual 0 top.
+dual/plus : dual (plus P Q) (with M N)
+             <- dual Q N
+             <- dual P M.
+dual/exist : dual (exist X P) (forall X N)
+              <- dual P N.
+dual/down : dual (down N) (up P)
+             <- dual P N.
+
+
+context : type.
+nil : context.
+cons/pos : context -> pos -> context.
+cons/neg : context -> neg -> context.
+
+append : context -> context -> context -> type.
+%mode append +G1 +G2 -G.
+append/nil : append nil G2 G2.
+append/pos : append (cons/pos G1 P) G2 (cons/pos G P)
+              <- append G1 G2 G.
+append/neg : append (cons/neg G1 N) G2 (cons/neg G N)
+              <- append G1 G2 G.
+
+perm1 : context -> context -> type.
+perm1/pos : perm1 G (cons/pos G' P)
+             <- append G1 G2 G'
+             <- append (cons/pos G1 P) G2 G.
+perm1/neg : perm1 G (cons/neg G' N)
+             <- append G1 G2 G'
+             <- append (cons/neg G1 N) G2 G.
+
+
+neg-all : context -> type.
+neg-all/nil : neg-all nil.
+neg-all/cons : neg-all (cons/neg G N)
+                <- neg-all G.
+
+atmost-one-pos : context -> type.
+atmost-one-pos/nil : atmost-one-pos nil.
+atmost-one-pos/pos : atmost-one-pos (cons/pos G P)
+                      <- neg-all G.
+atmost-one-pos/neg : atmost-one-pos (cons/neg G N)
+                      <- atmost-one-pos G.
+
+
+%% `append` preserves `neg-all`.
+apn : neg-all G1 -> neg-all G2 -> append G1 G2 G -> neg-all G -> type.
+%mode apn +NA1 +NA2 +C -NA.
+
+- : apn NA1 NA2 append/nil NA2.
+- : apn (neg-all/cons NA1) NA2 (append/neg C) (neg-all/cons NA)
+     <- apn NA1 NA2 C NA.
+
+%worlds () (apn _ _ _ _).
+%total C (apn _ _ C _).
+
+inv-apn : neg-all G -> append G1 G2 G -> neg-all G1 -> neg-all G2 -> type.
+%mode inv-apn +NA +C -NA1 -NA2.
+
+- : inv-apn NA append/nil neg-all/nil NA.
+- : inv-apn (neg-all/cons NA) (append/neg C) (neg-all/cons NA1) NA2
+     <- inv-apn NA C NA1 NA2.
+
+%worlds () (inv-apn _ _ _ _).
+%total C (inv-apn _ C _ _).
+
+dec : context -> context -> type.
+dec/1 : dec G1 G2
+         <- atmost-one-pos G2
+         <- neg-all G1.
+dec/2 : dec G1 G2
+            <- neg-all G2
+            <- atmost-one-pos G1.
+
+dec-cons-neg : {N:neg} dec G1 G2 -> dec (cons/neg G1 N) G2 -> type.
+%mode dec-cons-neg +N +D -D'.
+
+- : dec-cons-neg _ (dec/1 NA A) (dec/1 (neg-all/cons NA) A).
+- : dec-cons-neg _ (dec/2 A NA) (dec/2 (atmost-one-pos/neg A) NA).
+
+%worlds () (dec-cons-neg _ _ _).
+%total D (dec-cons-neg _ D _).
+
+decompose : append G1 G2 G -> atmost-one-pos G -> dec G1 G2 -> type.
+%mode decompose +C +A -R.
+
+- : decompose append/nil A (dec/1 neg-all/nil A).
+- : decompose (append/neg C) (atmost-one-pos/neg A) D'
+     <- decompose C A D
+     <- dec-cons-neg _ D D'.
+- : decompose (append/pos C) (atmost-one-pos/pos NA) (dec/2 (atmost-one-pos/pos NA1) NA2)
+     <- inv-apn NA C NA1 NA2.
+
+%worlds () (decompose _ _ _).
+%total C (decompose C _ _).
+
+decompose' : append (cons/neg G1 N) G2 G -> atmost-one-pos G -> dec G1 G2 -> type.
+%mode decompose' +C +A -R.
+
+- : decompose' (append/neg C) (atmost-one-pos/neg A) D
+     <- decompose C A D.
+
+%worlds () (decompose' _ _ _).
+%total C (decompose' C _ _).
+
+neg-all-atmost-one-pos : neg-all G -> atmost-one-pos G -> type.
+%mode neg-all-atmost-one-pos +NA -A.
+
+- : neg-all-atmost-one-pos neg-all/nil atmost-one-pos/nil.
+- : neg-all-atmost-one-pos (neg-all/cons NA) (atmost-one-pos/neg A)
+     <- neg-all-atmost-one-pos NA A.
+
+%worlds () (neg-all-atmost-one-pos _ _).
+%total NA (neg-all-atmost-one-pos NA _).
+
+append-atmost : neg-all G1 -> atmost-one-pos G2 -> append G1 G2 G -> atmost-one-pos G -> type.
+%mode append-atmost +NA +A +C -A'.
+
+- : append-atmost NA A append/nil A.
+- : append-atmost (neg-all/cons NA) A (append/neg C) (atmost-one-pos/neg A')
+     <- append-atmost NA A C A'.
+
+%worlds () (append-atmost _ _ _ _).
+%total C (append-atmost _ _ C _).
+
+append-atmost2 : atmost-one-pos G1 -> neg-all G2 -> append G1 G2 G -> atmost-one-pos G -> type.
+%mode append-atmost2 +A +NA +C -A'.
+
+- : append-atmost2 _ NA append/nil A'
+     <- neg-all-atmost-one-pos NA A'.
+- : append-atmost2 (atmost-one-pos/pos NA1) NA2 (append/pos C) (atmost-one-pos/pos NA)
+     <- apn NA1 NA2 C NA.
+- : append-atmost2 (atmost-one-pos/neg A) NA (append/neg C) (atmost-one-pos/neg A')
+     <- append-atmost2 A NA C A'.
+
+%worlds () (append-atmost2 _ _ _ _).
+%total C (append-atmost2 _ _ C _).
+
+compose : dec G1 G2 -> append G1 G2 G -> atmost-one-pos G -> type.
+%mode compose +D +C -A.
+
+- : compose (dec/1 NA A) append/nil A.
+- : compose (dec/2 _ NA) append/nil A'
+     <- neg-all-atmost-one-pos NA A'.
+- : compose (dec/2 (atmost-one-pos/pos NA1) NA2) (append/pos C) (atmost-one-pos/pos NA)
+     <- apn NA1 NA2 C NA.
+- : compose (dec/1 (neg-all/cons NA) A) (append/neg C) (atmost-one-pos/neg A')
+     <- append-atmost NA A C A'.
+- : compose (dec/2 (atmost-one-pos/neg A) NA) (append/neg C) (atmost-one-pos/neg A')
+     <- append-atmost2 A NA C A'.
+
+%worlds () (compose _ _ _).
+%total C (compose _ C _).
+
+%% `perm1` preserves `atmost-one-pos`.
+ppa : atmost-one-pos G -> perm1 G G' -> atmost-one-pos G' -> type.
+%mode ppa +A +E -A'.
+
+- : ppa (atmost-one-pos/pos NA) (perm1/pos (append/pos C1) C2) (atmost-one-pos/pos NA')
+    <- inv-apn NA C1 NA1 NA2
+    <- apn NA1 NA2 C2 NA'.
+
+- : ppa A (perm1/neg C1 C2) (atmost-one-pos/neg A')
+     <- decompose' C1 A D
+     <- compose D C2 A'.
+
+%worlds () (ppa _ _ _).
+%total E (ppa _ E _).
+
+
+%% Auxiliaries
+
+%% not-free-in/context : atom -> context -> type.
+%% not-free-in/pos : atom -> pos -> type.
+%% not-free-in/neg : atom -> neg -> type.
+
+%% not-free-in/context/nil : not-free-in/context X nil.
+%% not-free-in/context/pos : not-free-in/context X (cons/pos G P)
+%%                            <- not-free-in/pos X P
+%%                            <- not-free-in/context X G.
+%% not-free-in/context/neg : not-free-in/context X (cons/neg G N)
+%%                            <- not-free-in/neg X N
+%%                            <- not-free-in/context X G.
+
+%% not-free-in/pos/atm : not-free-in/pos X (atm Y).
+
+%% Rules
+
+jd : context -> type.
+
+%abbrev sing/pos = cons/pos nil.
+%abbrev sing/neg = cons/neg nil.
+
+jd/ax : jd (cons/pos (sing/neg N) P)
+         <- dual P N.
+
+jd/cut : jd G
+          <- append G1 G2 G
+          <- dual P N
+          <- jd (cons/pos G2 P)
+          <- jd (cons/neg G1 N).
+
+jd/par : jd (cons/neg G (par N M))
+          <- jd (cons/neg (cons/neg G N) M).
+
+jd/tensor : jd (cons/pos G (tensor P Q))
+             <- append G1 G2 G
+             <- jd (cons/pos G2 Q)
+             <- jd (cons/pos G1 P).
+
+jd/bot : jd (cons/neg G bot)
+          <- jd G.
+
+jd/1 : jd (sing/pos 1).
+
+jd/with : jd (cons/neg G (with N M))
+           <- jd (cons/neg G M)
+           <- jd (cons/neg G N).
+
+jd/plus1 : jd (cons/pos G (plus P Q))
+            <- jd (cons/pos G P).
+jd/plus2 : jd (cons/pos G (plus P Q))
+            <- jd (cons/pos G Q).
+
+jd/top : jd (cons/neg G top)
+          <- atmost-one-pos G.
+
+%% jd/forall : jd (cons/neg G (forall X N))
+%%              <- not-free-in/context X G
+%%              <- jd (cons/neg G N).
+
+%% jd/exist : jd (cons/pos G (exist X P)).
+
+jd/up : jd (cons/neg G (up P))
+         <- jd (cons/pos G P).
+
+jd/down : jd (cons/pos G (down N))
+           <- jd (cons/neg G N)
+           <- neg-all G.
+
+jd/exchange : jd G'
+               <- perm1 G G'
+               <- jd G.
+
+
+pos-lemma : jd G -> atmost-one-pos G -> type.
+%mode pos-lemma +J -A.
+
+- : pos-lemma (jd/ax _) (atmost-one-pos/pos (neg-all/cons neg-all/nil)).
+- : pos-lemma (jd/cut J1 J2 _ C) A'
+     <- pos-lemma J1 (atmost-one-pos/neg A1)
+     <- pos-lemma J2 (atmost-one-pos/pos NA2)
+     <- append-atmost2 A1 NA2 C A'.
+- : pos-lemma (jd/par J) (atmost-one-pos/neg A)
+     <- pos-lemma J (atmost-one-pos/neg (atmost-one-pos/neg A)).
+- : pos-lemma (jd/tensor J1 J2 C) (atmost-one-pos/pos NA)
+     <- pos-lemma J1 (atmost-one-pos/pos NA1)
+     <- pos-lemma J2 (atmost-one-pos/pos NA2)
+     <- apn NA1 NA2 C NA.
+- : pos-lemma (jd/bot J) (atmost-one-pos/neg A)
+     <- pos-lemma J A.
+- : pos-lemma jd/1 (atmost-one-pos/pos neg-all/nil).
+- : pos-lemma (jd/with J1 J2) (atmost-one-pos/neg A1)
+     <- pos-lemma J1 (atmost-one-pos/neg A1).
+- : pos-lemma (jd/plus1 J) (atmost-one-pos/pos NA)
+     <- pos-lemma J (atmost-one-pos/pos NA).
+- : pos-lemma (jd/plus2 J) (atmost-one-pos/pos NA)
+     <- pos-lemma J (atmost-one-pos/pos NA).
+- : pos-lemma (jd/top A) (atmost-one-pos/neg A).
+- : pos-lemma (jd/up J) (atmost-one-pos/neg A)
+     <- pos-lemma J (atmost-one-pos/pos NA)
+     <- neg-all-atmost-one-pos NA A.
+- : pos-lemma (jd/down NA J) (atmost-one-pos/pos NA).
+
+- : pos-lemma (jd/exchange J (perm1/pos (append/pos C1) C2)) (atmost-one-pos/pos NA')
+     <- pos-lemma J (atmost-one-pos/pos NA)
+     <- inv-apn NA C1 NA1 NA2
+     <- apn NA1 NA2 C2 NA'.
+- : pos-lemma (jd/exchange J (perm1/neg (append/neg C1) C2)) (atmost-one-pos/neg A')
+     <- pos-lemma J (atmost-one-pos/neg A)
+     <- decompose C1 A D
+     <- compose D C2 A'.
+
+
+%worlds () (pos-lemma _ _).
+%total J (pos-lemma J _).
